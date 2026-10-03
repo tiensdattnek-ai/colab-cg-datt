@@ -30,11 +30,25 @@ as_user() { sudo -u "$CCG_USER" env DISPLAY=:0 \
 
 apt_q() { apt-get install -y -qq --no-install-recommends "$@" >>"$CCG_LOG/apt.log" 2>&1; }
 
+wait_x() { # doi X socket san sang (X khong lang nghe TCP)
+  local d=${1:-0} t=${2:-30} i=0
+  while [ ! -S "/tmp/.X11-unix/X$d" ]; do i=$((i+1)); [ "$i" -ge "$t" ] && return 1; sleep 1; done
+  DISPLAY=:$d xdpyinfo >/dev/null 2>&1 || sleep 2; return 0
+}
+
+dl() { # tai co retry: dl <url> <out>
+  curl -fsSL --retry 4 --retry-delay 2 --connect-timeout 15 -o "$2" "$1" && return 0
+  wget -q --tries=3 --timeout=20 -O "$2" "$1"
+}
+
 wait_port() { # wait_port <port> <timeout_s>
   local p=$1 t=${2:-60} i=0
   while ! (echo >/dev/tcp/127.0.0.1/"$p") 2>/dev/null; do
     i=$((i+1)); [ "$i" -ge "$t" ] && return 1; sleep 1
   done; return 0
 }
+
+# Ghi ket qua buoc chay de doctor.sh doc lai
+mark() { echo "$1=$2" >> "$CCG_HOME/state.env"; }
 
 has_nvidia() { command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; }

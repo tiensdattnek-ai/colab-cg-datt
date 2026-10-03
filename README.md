@@ -30,6 +30,22 @@
 | **Lựa chọn Pro** | `TUNNEL=tailscale` → UDP P2P trực tiếp, bỏ qua edge Cloudflare | thấp nhất có thể |
 | **FEC/QP** | `fec_percentage=10`, `qp=24` cân bằng băng thông/độ nét | ít retransmit |
 
+## 🩺 Tự sửa lỗi
+```bash
+sudo bash scripts/doctor.sh    # chẩn đoán + khởi động lại đúng thành phần chết
+sudo bash scripts/80-verify.sh # health check 11 mục
+```
+
+### Đã fix ở v2.1.0
+| Lỗi | Nguyên nhân thật | Cách xử lý |
+|---|---|---|
+| `FAIL Cai Sunshine that bai` | GitHub encode `+` thành `%2B` trong URL (`...%2Bubuntu22.04_amd64.deb`) → regex `ubuntu-<ver>` trượt, fallback `sort -V\|tail` tải **nhầm gói arm64 của Ubuntu 26.10** | Resolver khớp đúng distro+version+arch, tụt dần về LTS gần nhất, + 3 lớp dự phòng `.deb → AppImage → Flatpak` |
+| Màn hình đen / X không lên | Container không có VT, dummy driver fail | `-novtswitch -sharevts vt1`, xoá `.X0-lock`, **fallback Xvfb** |
+| Treo ở bước chờ X | `wait_port 6000` sai — X không listen TCP | `wait_x` kiểm tra socket `/tmp/.X11-unix/X0` |
+| App trong Moonlight không mở | `prep-cmd` gọi `xrandr --output default` fail | Bỏ prep-cmd rủi ro |
+| Cảnh báo *unrecognized option* | Ghi tham số NVENC khi đang dùng software | Sinh config theo đúng encoder |
+| GPU có nhưng không dùng NVENC | Hardcode `libnvidia-encode-535` | Dò driver thật + kiểm tra `ldconfig` |
+
 ## 📦 Cấu trúc
 ```
 colab-cg-datt/
@@ -47,6 +63,8 @@ colab-cg-datt/
     ├── 50-moonweb.sh        # Moonlight Web client
     ├── 60-tunnel.sh         # Cloudflare QUIC / Tailscale
     ├── 70-latency.sh        # Tuning kernel, RT prio, GPU clock
+    ├── 80-verify.sh         # Health check 11 mục
+    ├── doctor.sh            # Tự chẩn đoán + tự sửa
     ├── pair.sh              # Pair bằng PIN qua API
     ├── status.sh            # Dashboard chẩn đoán
     └── backup.sh            # Backup/restore game ra Google Drive (zstd)
@@ -59,6 +77,7 @@ sudo RES_W=1920 RES_H=1080 FPS=60 ENCODER=nvenc CODEC=hevc TUNNEL=cloudflare \
      bash scripts/install.sh
 sudo bash scripts/pair.sh 1234     # PIN từ Moonlight
 sudo bash scripts/status.sh        # xem trạng thái + RTT + GPU
+sudo bash scripts/doctor.sh        # khi có trục trặc
 ```
 
 ### Biến môi trường
@@ -82,6 +101,7 @@ sudo bash scripts/status.sh        # xem trạng thái + RTT + GPU
 ## 🩺 Khắc phục sự cố
 | Triệu chứng | Cách xử lý |
 |---|---|
+| Cài Sunshine lỗi | Đã fix ở v2.1; nếu vẫn lỗi: `sudo bash scripts/doctor.sh`, script sẽ tự chuyển sang AppImage |
 | Không có link `trycloudflare` | `sudo tail -f /var/log/ccg/cf-web.log`, chạy lại cell ② |
 | Pair báo false | PIN hết hạn (60s) — lấy PIN mới |
 | Màn hình đen | `sudo tail /var/log/ccg/xorg.log`; thử res thấp hơn |
@@ -94,6 +114,9 @@ Google Colab **cấm** dùng runtime cho remote desktop, game streaming, P2P, mi
 
 ## 🙏 Nguồn tham khảo
 [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine) · [kmille36/Colab-Cloud-Gaming](https://github.com/kmille36/Colab-Cloud-Gaming) · [kmille36/moonlight-web-remote](https://github.com/kmille36/moonlight-web-remote) · [cloudflared](https://github.com/cloudflare/cloudflared)
+
+## 📜 Changelog
+Xem [CHANGELOG.md](CHANGELOG.md) — v2.1.0 fix lỗi cài Sunshine + hardening.
 
 ## 📄 License
 MIT © tiensdattnek-ai

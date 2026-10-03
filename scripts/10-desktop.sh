@@ -55,9 +55,25 @@ Section "Screen"
 EndSection
 XCONF
 
-pkill -f "Xorg :0" 2>/dev/null || true; sleep 1
-Xorg :0 -config /etc/X11/xorg-ccg.conf -noreset -nolisten tcp >"$CCG_LOG/xorg.log" 2>&1 &
-wait_port 6000 5 || sleep 4
+pkill -f "Xorg :0" 2>/dev/null || true
+pkill -f "Xvfb :0" 2>/dev/null || true; sleep 1
+rm -f /tmp/.X0-lock
+
+# Container thuong khong co VT -> can -novtswitch -sharevts
+Xorg :0 -config /etc/X11/xorg-ccg.conf -noreset -nolisten tcp \
+     -novtswitch -sharevts vt1 >"$CCG_LOG/xorg.log" 2>&1 &
+if ! wait_x 0 20; then
+  warn "Xorg dummy that bai -> fallback Xvfb (van stream duoc)"
+  tail -5 "$CCG_LOG/xorg.log" 2>/dev/null
+  pkill -f "Xorg :0" 2>/dev/null || true; rm -f /tmp/.X0-lock
+  apt_q xvfb
+  Xvfb :0 -screen 0 "${RES_W}x${RES_H}x24" -nolisten tcp -dpi 96 +extension GLX +extension RANDR \
+       >"$CCG_LOG/xorg.log" 2>&1 &
+  wait_x 0 25 || die "Khong khoi dong duoc X server (xem $CCG_LOG/xorg.log)"
+  mark XSERVER xvfb
+else
+  mark XSERVER xorg-dummy
+fi
 export DISPLAY=:0
 xhost +local: >/dev/null 2>&1 || true
 
@@ -74,4 +90,12 @@ if [ "$LOWLAT" = "1" ]; then
   as_user xfconf-query -c xsettings -p /Gtk/EnableAnimations -s false 2>/dev/null || true
   as_user xset s off -dpms 2>/dev/null || true
 fi
-ok "Desktop ${RES_W}x${RES_H}@${FPS} san sang"
+# Kiem chung desktop that su len
+if ! pgrep -u "$CCG_USER" -f xfce4-session >/dev/null; then
+  warn "xfce4-session chua chay, thu lai bang xfwm4 toi gian"
+  as_user dbus-launch xfwm4 >>"$CCG_LOG/xfce.log" 2>&1 &
+  as_user xfdesktop >>"$CCG_LOG/xfce.log" 2>&1 &
+  sleep 3
+fi
+mark DESKTOP ok
+ok "Desktop ${RES_W}x${RES_H}@${FPS} san sang ($(DISPLAY=:0 xdpyinfo 2>/dev/null | awk '/dimensions/{print $2}'))"
