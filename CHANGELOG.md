@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.1 — Fix notebook mất thư mục làm việc
+- **Lỗi**: chạy lại cell cài đặt lần 2 → `shell-init: error retrieving current directory`,
+  `fatal: Unable to read current working directory`, `bash: scripts/install.sh: No such file`.
+  Nguyên nhân: lần chạy trước `%cd /content/colab-cg-datt` đặt cwd vào thư mục đó, cell sau `rm -rf` xoá
+  chính thư mục đang đứng → mọi lệnh shell sau đều mất cwd nên `git clone` fail.
+- **Fix**: cell cài đặt chuyển sang Python thuần — `os.chdir('/content')` **trước** khi `shutil.rmtree`,
+  kiểm chứng `scripts/install.sh` tồn tại, **fallback tải tarball** nếu `git clone` lỗi,
+  gọi installer bằng **đường dẫn tuyệt đối** (không phụ thuộc cwd).
+- Thêm cell 🧹 **Reset an toàn** để dọn dẹp khi kẹt.
+
 ## v2.1.0 — Hotfix "Cai Sunshine that bai" + hardening
 ### 🐞 Sửa lỗi
 - **[CRITICAL] Cài Sunshine thất bại**: tên asset GitHub là `...%2Bubuntu22.04_amd64.deb`

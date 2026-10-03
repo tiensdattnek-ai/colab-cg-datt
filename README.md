@@ -101,6 +101,7 @@ sudo bash scripts/doctor.sh        # khi có trục trặc
 ## 🩺 Khắc phục sự cố
 | Triệu chứng | Cách xử lý |
 |---|---|
+| `shell-init: error retrieving current directory` / `Unable to read current working directory` | Cell trước đã `%cd` vào thư mục rồi cell sau `rm -rf` chính nó → shell mất cwd. **Fix v2.1.1**: luôn `os.chdir('/content')` trước khi xoá; có thêm cell 🧹 *Reset an toàn* |
 | Cài Sunshine lỗi | Đã fix ở v2.1; nếu vẫn lỗi: `sudo bash scripts/doctor.sh`, script sẽ tự chuyển sang AppImage |
 | Không có link `trycloudflare` | `sudo tail -f /var/log/ccg/cf-web.log`, chạy lại cell ② |
 | Pair báo false | PIN hết hạn (60s) — lấy PIN mới |
