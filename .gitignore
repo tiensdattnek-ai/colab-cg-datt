@@ -1,0 +1,7 @@
+*.log
+*.deb
+*.tar.zst
+__pycache__/
+.ipynb_checkpoints/
+urls.env
+encoder.env
