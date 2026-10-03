@@ -32,6 +32,8 @@
 
 ## 🩺 Tự sửa lỗi
 ```bash
+sudo bash scripts/gpu-check.sh     # T4 có được nhận không, NVENC chạy không
+sudo bash scripts/collect-logs.sh  # xuất báo cáo đầy đủ để gửi issue
 sudo bash scripts/doctor.sh    # chẩn đoán + khởi động lại đúng thành phần chết
 sudo bash scripts/80-verify.sh # health check 11 mục
 ```
@@ -102,6 +104,8 @@ sudo bash scripts/doctor.sh        # khi có trục trặc
 | Triệu chứng | Cách xử lý |
 |---|---|
 | `shell-init: error retrieving current directory` / `Unable to read current working directory` | Cell trước đã `%cd` vào thư mục rồi cell sau `rm -rf` chính nó → shell mất cwd. **Fix v2.1.1**: luôn `os.chdir('/content')` trước khi xoá; có thêm cell 🧹 *Reset an toàn* |
+| Có T4 nhưng chọn `software` | Colab mount driver ngoài ld cache → `ldconfig -p` không thấy `libnvidia-encode`. **Fix v2.2**: dò 4 tầng + test ffmpeg + nạp `ld.so.conf`. Muốn chắc: chọn `ENCODER=nvenc` để ép |
+| `Buoc bat buoc 'Sunshine' that bai` | Thiếu `libqt6*` (kho universe tắt) hoặc Sunshine không mở được cổng 47990. **Fix v2.2**: bật universe, cài đủ deps, verify binary → tự chuyển AppImage, khởi động 3 nấc user→root→software |
 | Cài Sunshine lỗi | Đã fix ở v2.1; nếu vẫn lỗi: `sudo bash scripts/doctor.sh`, script sẽ tự chuyển sang AppImage |
 | Không có link `trycloudflare` | `sudo tail -f /var/log/ccg/cf-web.log`, chạy lại cell ② |
 | Pair báo false | PIN hết hạn (60s) — lấy PIN mới |

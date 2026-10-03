@@ -26,8 +26,14 @@ run_step() { # run_step <file> <ten> <critical:0|1>
   warn "Buoc '$n' loi -> thu lai lan 2"
   if bash "$D/$f"; then ok "'$n' thanh cong o lan 2"; return 0; fi
   if [ "$crit" = 1 ]; then
-    echo; echo "=== 25 dong cuoi log lien quan ==="
-    tail -25 "$CCG_LOG"/*.log 2>/dev/null | tail -40
+    echo; echo "=== NHAT KY CHI TIET ==="
+    case "$n" in
+      *Sunshine*) tail -40 "$CCG_LOG/sunshine.log" 2>/dev/null; echo "--- apt ---"; tail -15 "$CCG_LOG/apt.log" 2>/dev/null ;;
+      *Desktop*)  tail -30 "$CCG_LOG/xorg.log" 2>/dev/null; tail -10 "$CCG_LOG/xfce.log" 2>/dev/null ;;
+      *)          tail -25 "$CCG_LOG"/*.log 2>/dev/null | tail -40 ;;
+    esac
+    echo "========================"
+    echo "Gui bao cao day du: sudo bash scripts/collect-logs.sh"
     die "Buoc bat buoc '$n' that bai. Chay: sudo bash scripts/doctor.sh"
   fi
   warn "Bo qua '$n' (khong bat buoc)"; return 0
@@ -45,7 +51,7 @@ echo; bash "$D/80-verify.sh"
 
 source "$CCG_HOME/urls.env" 2>/dev/null || true
 source "$CCG_HOME/encoder.env" 2>/dev/null || true
-cp -f "$D/pair.sh" "$D/status.sh" "$D/backup.sh" "$D/doctor.sh" /usr/local/bin/ 2>/dev/null || true
+cp -f "$D/pair.sh" "$D/status.sh" "$D/backup.sh" "$D/doctor.sh" "$D/collect-logs.sh" /usr/local/bin/ 2>/dev/null || true
 chmod +x /usr/local/bin/pair.sh /usr/local/bin/status.sh /usr/local/bin/backup.sh /usr/local/bin/doctor.sh 2>/dev/null || true
 
 ELAPSED=$(( $(date +%s) - START ))

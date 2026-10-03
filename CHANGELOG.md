@@ -1,5 +1,30 @@
 # Changelog
 
+## v2.2.0 — Fix "không nhận T4 / tự tụt về CPU" + Sunshine không khởi động
+
+### 🎮 GPU / NVENC
+- **Nguyên nhân tự tụt về `software`**: Colab mount driver NVIDIA **ngoài ld cache** (`/usr/lib64-nvidia`,
+  `/usr/local/nvidia/lib64`), script chỉ kiểm tra `ldconfig -p` nên không thấy `libnvidia-encode` → kết luận "không có GPU encode".
+- Nay dò theo **4 tầng**: `ldconfig` (sau khi refresh) → quét 8 thư mục driver phổ biến → `find` toàn hệ thống →
+  **test encode thật bằng `ffmpeg -c:v h264_nvenc`**.
+- Tự ghi `ld.so.conf.d/zz-ccg-nvidia.conf` + tạo symlink `libnvidia-encode.so.1` nếu thiếu, export `LD_LIBRARY_PATH` cho Sunshine.
+- Bỏ cài `libnvidia-encode-535` bằng apt (có thể **phá driver sẵn có** của Colab).
+- Chọn `ENCODER=nvenc` thủ công = **ép dùng GPU**, script không tự hạ xuống CPU nữa.
+- Thêm `scripts/gpu-check.sh` kiểm tra nhanh trước khi cài; ô ① của notebook báo rõ có/không có T4.
+
+### ☀️ Sunshine không khởi động
+- Bật kho `universe` trước khi cài (một số image Colab tắt → thiếu `libqt6*` → cài `.deb` fail).
+- Cài sẵn đúng bộ deps thật của gói (`libqt6core6/gui6/widgets6/svg6`, `libminiupnpc17/18`, `libxtst6`, `libvulkan1`…).
+- **Kiểm chứng binary chạy được** (`sunshine --version`); nếu báo *error while loading shared libraries* → **tự gỡ deb và chuyển sang AppImage**.
+- Tạo `/run/user/<uid>`, `xhost +local:`, `modprobe uinput` + `chmod 0666 /dev/uinput` (báo rõ khi Colab không có uinput).
+- Đặt mật khẩu bằng **CLI `sunshine --creds`** thay vì phụ thuộc web API.
+- Khởi động theo **3 nấc**: user thường → root → hạ `encoder=software` (loại trừ lỗi NVENC) — thay vì chết ngay.
+- Khi fail: in **40 dòng log Sunshine + 15 dòng apt** ngay tại chỗ, kèm gợi ý lệnh kiểm tra X.
+
+### 🧰 Công cụ
+- `scripts/collect-logs.sh` — xuất báo cáo đầy đủ (hệ thống, GPU, state, tiến trình, cổng, 6 file log) ra `/content/ccg-report.txt`.
+- Ô 🩺 Doctor trong notebook có dropdown: `doctor` / `gpu-check` / `collect-logs` / `verify`.
+
 ## v2.1.1 — Fix notebook mất thư mục làm việc
 - **Lỗi**: chạy lại cell cài đặt lần 2 → `shell-init: error retrieving current directory`,
   `fatal: Unable to read current working directory`, `bash: scripts/install.sh: No such file`.

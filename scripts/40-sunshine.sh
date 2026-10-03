@@ -87,8 +87,14 @@ if command -v sunshine >/dev/null 2>&1; then
   ok "Sunshine da co san: $(sunshine --version 2>/dev/null | head -1)"
 else
   say "Cai Sunshine (host streaming)"
-  apt_q libminiupnpc17 libevdev2 libnotify4 libcurl4 libdrm2 libnuma1 libpulse0 \
-        libopus0 libva2 libva-drm2 libvdpau1 libnvidia-encode-535 2>/dev/null || true
+  # Mot so image Colab tat kho 'universe' -> thieu libqt6 -> cai .deb that bai
+  if command -v add-apt-repository >/dev/null 2>&1; then
+    add-apt-repository -y universe >>"$CCG_LOG/apt.log" 2>&1 || true
+    apt-get update -qq >>"$CCG_LOG/apt.log" 2>&1 || true
+  fi
+  apt_q libminiupnpc17 libminiupnpc18 libevdev2 libnotify4 libcurl4 libdrm2 libnuma1 \
+        libpulse0 libopus0 libva2 libva-drm2 libvdpau1 libxtst6 libvulkan1 \
+        libqt6core6 libqt6gui6 libqt6widgets6 libqt6svg6 2>/dev/null || true
   URL=$(resolve_sunshine_url)
   INSTALLED=0
   if [ -n "$URL" ] && [[ "$URL" == *.deb ]]; then
@@ -99,6 +105,16 @@ else
   if [ "$INSTALLED" = 0 ]; then
     echo "----- 30 dong cuoi apt.log -----"; tail -30 "$CCG_LOG/apt.log" 2>/dev/null
     die "Khong cai duoc Sunshine. Gui log tren vao issue cua repo."
+  fi
+fi
+# --- Kiem chung binary thuc su chay duoc (thieu .so la doi sang AppImage) ---
+if ! sunshine --version >/tmp/sunver.txt 2>&1; then
+  if grep -qi "error while loading shared libraries\|not found" /tmp/sunver.txt; then
+    warn "Binary thieu thu vien: $(head -1 /tmp/sunver.txt)"
+    warn "-> chuyen sang AppImage"
+    apt-get remove -y -qq sunshine >>"$CCG_LOG/apt.log" 2>&1 || true
+    hash -r
+    install_from_appimage || die "AppImage cung that bai, xem $CCG_LOG/apt.log"
   fi
 fi
 SUN_BIN=$(command -v sunshine)
@@ -130,14 +146,49 @@ printf '\n%s\n' "$EXTRA" >>"$CFG/sunshine.conf"
 cp "$(dirname "$0")/../config/apps.json" "$CFG/apps.json"
 chown -R "$CCG_USER:$CCG_USER" "$CFG"
 
+# --------------------------------------------------------------- chuan bi runtime
+modprobe uinput 2>/dev/null || true
+[ -e /dev/uinput ] && chmod 0666 /dev/uinput 2>/dev/null || \
+  warn "Khong co /dev/uinput (binh thuong tren Colab) — chuot/phim van chay qua X11, gamepad ao se tat"
+
+UIDG=$(id -u "$CCG_USER")
+install -d -m 0700 -o "$CCG_USER" -g "$CCG_USER" "/run/user/$UIDG"
+export DISPLAY=:0; xhost +local: >/dev/null 2>&1 || true
+
+# Dat credential bang CLI (khong phu thuoc web API)
+as_user sunshine --creds admin admin >>"$CCG_LOG/sunshine.log" 2>&1 || true
+
 # --------------------------------------------------------------- chay
-pkill -f '[s]unshine' 2>/dev/null || true; sleep 1
-as_user sunshine "$CFG/sunshine.conf" >"$CCG_LOG/sunshine.log" 2>&1 &
+start_sunshine() { # start_sunshine <mode>
+  pkill -f '[s]unshine' 2>/dev/null || true; sleep 1
+  if [ "$1" = root ]; then
+    DISPLAY=:0 HOME="/home/$CCG_USER" XDG_RUNTIME_DIR="/run/user/$UIDG" \
+      nohup sunshine "$CFG/sunshine.conf" >>"$CCG_LOG/sunshine.log" 2>&1 &
+  else
+    as_user sunshine "$CFG/sunshine.conf" >>"$CCG_LOG/sunshine.log" 2>&1 &
+  fi
+}
+
+: >"$CCG_LOG/sunshine.log"
+start_sunshine user
 if ! wait_port 47990 60; then
-  warn "Sunshine chua mo cong 47990 — thu lai bang user root"
-  tail -20 "$CCG_LOG/sunshine.log" 2>/dev/null
-  DISPLAY=:0 nohup sunshine "$CFG/sunshine.conf" >>"$CCG_LOG/sunshine.log" 2>&1 &
-  wait_port 47990 45 || { tail -30 "$CCG_LOG/sunshine.log"; die "Sunshine khong khoi dong duoc"; }
+  warn "Chua mo cong 47990 bang user '$CCG_USER' — thu lai bang root"
+  tail -15 "$CCG_LOG/sunshine.log"
+  start_sunshine root
+  if ! wait_port 47990 50; then
+    warn "Van that bai — thu che do software encoder (loai tru loi NVENC)"
+    sed -i 's/^encoder = .*/encoder = software/' "$CFG/sunshine.conf"
+    sed -i '/^nvenc_/d' "$CFG/sunshine.conf"
+    start_sunshine root
+    if ! wait_port 47990 50; then
+      echo; echo "════════ NHAT KY SUNSHINE (40 dong cuoi) ════════"
+      tail -40 "$CCG_LOG/sunshine.log"
+      echo "═════════════════════════════════════════════════"
+      echo "Goi y: X dang chay? -> ls /tmp/.X11-unix ; DISPLAY=:0 xdpyinfo | head -3"
+      die "Sunshine khong khoi dong duoc (xem nhat ky tren)"
+    fi
+    ENCODER=software; warn "Da ha ve software encoder de chay duoc"
+  fi
 fi
 
 for _ in 1 2 3; do
@@ -146,4 +197,6 @@ for _ in 1 2 3; do
     -d '{"currentUsername":"","currentPassword":"","newUsername":"admin","newPassword":"admin","confirmNewPassword":"admin"}' >/dev/null 2>&1 && break
   sleep 2
 done
+mark SUNSHINE "$ENCODER"
+grep -iE "error|fatal|fail" "$CCG_LOG/sunshine.log" | head -5 | sed 's/^/  log: /' || true
 ok "Sunshine chay • encoder=$ENCODER • codec=$CODEC • UI https://localhost:47990 (admin/admin)"
